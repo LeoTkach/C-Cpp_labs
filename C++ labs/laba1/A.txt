@@ -1,0 +1,118 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <iterator>
+
+class FileProcessor {
+private:
+    std::string inputFilePath;
+    std::string outputFilePath;
+    std::vector<unsigned char> fileBytes;
+    std::vector<std::vector<unsigned char>> lines;
+
+public:
+    FileProcessor(const std::string& input, const std::string& output)
+        : inputFilePath(input), outputFilePath(output) {}
+
+    // Чтение байтов из файла
+    bool readFile() {
+        std::ifstream inputFile(inputFilePath, std::ios::binary);
+        if (!inputFile) {
+            std::cerr << "Не удалось открыть входной файл" << std::endl;
+            return false;
+        }
+        // Чтение всех байтов
+        fileBytes = std::vector<unsigned char>(
+            (std::istreambuf_iterator<char>(inputFile)),
+            std::istreambuf_iterator<char>()
+        );
+        inputFile.close();
+        return true;
+    }
+
+    // Разбивка байтов на строки с сохранением концевых байтов
+    void splitIntoLines() {
+        std::vector<unsigned char> currentLine;
+        for (unsigned char byte : fileBytes) {
+            currentLine.push_back(byte);
+
+            // Проверка на конец строки (0D 0A или 0A)
+            if (byte == 0x0A ||
+                (currentLine.size() >= 2 &&
+                    currentLine[currentLine.size() - 2] == 0x0D &&
+                    currentLine[currentLine.size() - 1] == 0x0A)) {
+                lines.push_back(currentLine);
+                currentLine.clear();
+            }
+        }
+
+        // Добавление последней строки, если она не пустая
+        if (!currentLine.empty()) {
+            lines.push_back(currentLine);
+        }
+    }
+
+    // Переворот символов в строках, исключая байты конца строки
+    void reverseLines() {
+        for (auto& line : lines) {
+            // Найти позицию концевых байтов (0D 0A или 0A)
+            size_t endingPos = line.size();
+
+            // Проверка на 0D 0A
+            if (line.size() >= 2 &&
+                line[line.size() - 2] == 0x0D &&
+                line[line.size() - 1] == 0x0A) {
+                endingPos -= 2;
+            }
+            // Проверка на 0A
+            else if (line.back() == 0x0A) {
+                endingPos -= 1;
+            }
+
+            // Переворачиваем символы до концевых байтов
+            std::reverse(line.begin(), line.begin() + endingPos);
+        }
+    }
+
+    // Запись результата в выходной файл
+    bool writeToFile() {
+        std::ofstream outputFile(outputFilePath, std::ios::binary);
+        if (!outputFile) {
+            std::cerr << "Не удалось открыть выходной файл" << std::endl;
+            return false;
+        }
+
+        for (const auto& line : lines) {
+            outputFile.write(reinterpret_cast<const char*>(line.data()), line.size());
+        }
+
+        outputFile.close();
+        return true;
+    }
+
+    // Основной метод обработки файла
+    bool processFile() {
+        if (!readFile()) return false;
+        splitIntoLines();
+        reverseLines();
+        return writeToFile();
+    }
+};
+
+int main() {
+    std::string inputPath = "C:\\Users\\user\\source\\repos\\NURE_OS_lab_1\\NURE_OS_lab_1\\inputA.txt";
+    std::string outputPath = "C:\\Users\\user\\source\\repos\\NURE_OS_lab_1\\NURE_OS_lab_1\\outputA.txt";
+
+    FileProcessor processor(inputPath, outputPath);
+
+    if (processor.processFile()) {
+        std::cout << "Файл успешно обработан!" << std::endl;
+    }
+    else {
+        std::cout << "Ошибка при обработке файла." << std::endl;
+    }
+
+    return 0;
+}
